@@ -5,9 +5,9 @@ var chai = require('chai');
 chai.use(require('chai-subset'));
 var assert = chai.assert;
 
-var SerialPort = require('./mocks/darwin-hardware');
-var hardware = SerialPort.hardware;
-var bindings = hardware.mockBinding;
+var SerialPort = require('../');
+var mockBindings = require('../lib/bindings-mock');
+SerialPort.bindings = mockBindings;
 
 describe('SerialPort', function() {
   var sandbox;
@@ -16,8 +16,8 @@ describe('SerialPort', function() {
     sandbox = sinon.sandbox.create();
 
     // Create a port for fun and profit
-    hardware.reset();
-    hardware.createPort('/dev/exists');
+    mockBindings.reset();
+    mockBindings.createPort('/dev/exists');
   });
 
   afterEach(function() {
@@ -25,10 +25,6 @@ describe('SerialPort', function() {
   });
 
   describe('Depreciated options', function() {
-    it('legacy constructor still works', function(done){
-      this.port = new SerialPort.SerialPort('/dev/exists', done);
-    });
-
     it('throws when `openImmediately` is set', function(done) {
       try {
         this.port = new SerialPort('/dev/exists', {}, false);
@@ -200,7 +196,7 @@ describe('SerialPort', function() {
 
       it('returns false when the port is opening', function(done) {
         var port = new SerialPort('/dev/exists', { autoOpen: false });
-        sandbox.stub(bindings, 'open', function() {
+        sandbox.stub(mockBindings, 'open', function() {
           assert.isTrue(port.opening);
           assert.isFalse(port.isOpen);
           done();
@@ -217,7 +213,7 @@ describe('SerialPort', function() {
 
       it('returns false when the port is closing', function(done) {
         var port;
-        sandbox.stub(bindings, 'close', function() {
+        sandbox.stub(mockBindings, 'close', function() {
           assert.isTrue(port.closing);
           assert.isFalse(port.isOpen);
           done();
@@ -242,7 +238,7 @@ describe('SerialPort', function() {
   describe('Methods', function() {
     describe('#open', function() {
       it('passes the port to the bindings', function(done) {
-        var openSpy = sandbox.spy(bindings, 'open');
+        var openSpy = sandbox.spy(mockBindings, 'open');
         var port = new SerialPort('/dev/exists', { autoOpen: false });
         assert.isFalse(port.isOpen);
         port.open(function(err) {
@@ -266,7 +262,7 @@ describe('SerialPort', function() {
           stopBits: 1,
           bufferSize: 65536
         };
-        sandbox.stub(bindings, 'open', function(path, opt, cb) {
+        sandbox.stub(mockBindings, 'open', function(path, opt, cb) {
           assert.equal(path, '/dev/exists');
           assert.containSubset(opt, defaultOptions);
           assert.isFunction(cb);
@@ -293,7 +289,7 @@ describe('SerialPort', function() {
                 assert.deepEqual(res, data);
                 done();
               });
-              hardware.emitData('/dev/exists', data);
+              mockBindings.emitData('/dev/exists', data);
             });
           });
         });
@@ -414,7 +410,7 @@ describe('SerialPort', function() {
         port.on('open', function(){
           var data = new Buffer('Crazy!');
           port.write(data, function(){
-            var lastWrite = hardware.fds[port.fd].lastWrite;
+            var lastWrite = mockBindings.fds[port.fd].lastWrite;
             assert.deepEqual(data, lastWrite);
             done();
           });
@@ -426,7 +422,7 @@ describe('SerialPort', function() {
         port.on('open', function(){
           var data = 'Crazy!';
           port.write(data, function(){
-            var lastWrite = hardware.fds[port.fd].lastWrite;
+            var lastWrite = mockBindings.fds[port.fd].lastWrite;
             assert.deepEqual(new Buffer(data), lastWrite);
             done();
           });
@@ -438,7 +434,7 @@ describe('SerialPort', function() {
         port.on('open', function(){
           var data = [0,32,44,88];
           port.write(data, function(){
-            var lastWrite = hardware.fds[port.fd].lastWrite;
+            var lastWrite = mockBindings.fds[port.fd].lastWrite;
             assert.deepEqual(new Buffer(data), lastWrite);
             done();
           });
@@ -465,7 +461,7 @@ describe('SerialPort', function() {
           rts: true
         };
 
-        sandbox.stub(bindings, 'set', function(fd, options) {
+        sandbox.stub(mockBindings, 'set', function(fd, options) {
           assert.deepEqual(options, settings);
           done();
         });
@@ -489,7 +485,7 @@ describe('SerialPort', function() {
           dts: true,
           rts: false
         };
-        sandbox.stub(bindings, 'set', function(fd, options) {
+        sandbox.stub(mockBindings, 'set', function(fd, options) {
           assert.deepEqual(options, filledWithMissing);
           done();
         });
@@ -507,7 +503,7 @@ describe('SerialPort', function() {
           dts: false,
           rts: true
         };
-        sandbox.stub(bindings, 'set', function(fd, options) {
+        sandbox.stub(mockBindings, 'set', function(fd, options) {
           assert.deepEqual(options, defaults);
           done();
         });
@@ -566,7 +562,7 @@ describe('SerialPort', function() {
           assert.deepEqual(recvData, testData);
           done();
         });
-        hardware.emitData('/dev/exists', testData);
+        mockBindings.emitData('/dev/exists', testData);
       });
     });
   });
@@ -575,7 +571,7 @@ describe('SerialPort', function() {
     it('emits a disconnect event and closes the port', function(done) {
       var port = new SerialPort('/dev/exists', function() {
         assert.isTrue(port.isOpen);
-        hardware.disconnect('/dev/exists');
+        mockBindings.disconnect('/dev/exists');
       });
       var spy = sandbox.spy();
       port.on('disconnect', spy);

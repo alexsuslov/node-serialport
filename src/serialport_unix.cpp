@@ -149,7 +149,10 @@ int setBaudRate(ConnectionOptionsBaton *data) {
 
   // get port options
   struct termios options;
-  tcgetattr(fd, &options);
+  if (-1 == tcgetattr(fd, &options)) {
+    snprintf(data->errorString, sizeof(data->errorString), "Error: %s setting custom baud rate of %d", strerror(errno), data->baudRate);
+    return -1;
+  }
 
   // If there is a custom baud rate on linux you can do the following trick with B38400
   #if defined(__linux__) && defined(ASYNC_SPD_CUST)

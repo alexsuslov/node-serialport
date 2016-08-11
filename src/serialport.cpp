@@ -271,23 +271,28 @@ NAN_METHOD(Write) {
   }
   v8::Local<v8::Function> callback = info[2].As<v8::Function>();
 
-  WriteBaton* baton = new WriteBaton();
-  memset(baton, 0, sizeof(WriteBaton));
-  baton->fd = fd;
-  baton->buffer.Reset(buffer);
-  baton->bufferData = bufferData;
-  baton->bufferLength = bufferLength;
-  baton->offset = 0;
-  baton->callback = new Nan::Callback(callback);
+  WriteBaton* data = new WriteBaton();
+  memset(data, 0, sizeof(WriteBaton));
+  data->fd = fd;
+  data->buffer.Reset(buffer);
+  data->bufferData = bufferData;
+  data->bufferLength = bufferLength;
+  data->offset = 0;
+  data->callback = new Nan::Callback(callback);
 
   QueuedWrite* queuedWrite = new QueuedWrite();
   memset(queuedWrite, 0, sizeof(QueuedWrite));
-  queuedWrite->baton = baton;
+  queuedWrite->baton = data;
   queuedWrite->req.data = queuedWrite;
 
   _WriteQueue *q = qForFD(fd);
   if (!q) {
-    Nan::ThrowTypeError("There's no write queue for that file descriptor (write)!");
+    snprintf(data->errorString, sizeof(data->errorString), "There's no write queue for file descriptor %d in (write)", fd);
+    v8::Local<v8::Value> argv[1];
+    argv[0] = v8::Exception::Error(Nan::New<v8::String>(data->errorString).ToLocalChecked());
+    data->callback->Call(1, argv);
+    delete data->callback;
+    delete data;
     return;
   }
 
@@ -322,7 +327,6 @@ void EIO_AfterWrite(uv_work_t* req) {
     // We're not done with this baton, so throw it right back onto the queue.
     // Don't re-push the write in the event loop if there was an error; because same error could occur again!
     // TODO: Add a uv_poll here for unix...
-    // fprintf(stderr, "Write again...\n");
     uv_queue_work(uv_default_loop(), req, EIO_Write, (uv_after_work_cb)EIO_AfterWrite);
     return;
   }
@@ -660,6 +664,7 @@ SerialPortStopBits NAN_INLINE(ToStopBitEnum(double stopBits)) {
   }
   return SERIALPORT_STOPBITS_ONE;
 }
+
 
 extern "C" {
   void init(v8::Handle<v8::Object> target) {
